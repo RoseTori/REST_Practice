@@ -5,6 +5,8 @@ import habsida.spring.boot_security.demo.models.User;
 import habsida.spring.boot_security.demo.service.RoleService;
 import habsida.spring.boot_security.demo.service.UserServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -34,18 +36,20 @@ public class AdminController {
     public String users(Model model) {
         List<User> users = userService.findAll();
         model.addAttribute("users", users);
-        return "admin/list";
-    }
 
-    @GetMapping("/admin/list/create")
-    public String showCreateForm(Model model) {
-        User user = new User();
-        model.addAttribute("user", user);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+        User currentUser = userService.findByUsername(currentUsername);
+        model.addAttribute("currentUser", currentUser);
 
         List<Role> availableRoles = roleService.findAll();
         model.addAttribute("availableRoles", availableRoles);
-        return "admin/create";
+
+        model.addAttribute("user", new User());
+
+        return "admin/list";
     }
+
     @PostMapping("/admin/list/create")
     public String createUser(@ModelAttribute User user,
                              @RequestParam(value = "roleIds", required = false) List<Long> roleIds,
@@ -66,8 +70,16 @@ public class AdminController {
         } catch (RuntimeException e) {
             model.addAttribute("errorMessage", e.getMessage());
             model.addAttribute("user", user);
+
+            List<User> users = userService.findAll();
+            model.addAttribute("users", users);
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUsername = authentication.getName();
+            User currentUser = userService.findByUsername(currentUsername);
+            model.addAttribute("currentUser", currentUser);
             model.addAttribute("availableRoles", roleService.findAll());
-            return "admin/create";
+
+            return "admin/list";
         }
     }
 
