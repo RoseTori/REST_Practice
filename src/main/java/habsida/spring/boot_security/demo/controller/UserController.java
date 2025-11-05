@@ -1,26 +1,29 @@
 package habsida.spring.boot_security.demo.controller;
 
+import habsida.spring.boot_security.demo.domain.UserDTO;
+import habsida.spring.boot_security.demo.mappers.UserMapper;
 import habsida.spring.boot_security.demo.models.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-@Controller
+
+@RequestMapping("/api/user")
+@RestController
 public class    UserController {
 
-    @GetMapping("/user/info")
-    public String userPage(Model model) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal();
+    private final UserMapper userMapper;
 
-        model.addAttribute("currentUser", currentUser);
-        return "user/info";
+    @Autowired
+    public UserController(UserMapper userMapper) {
+        this.userMapper = userMapper;
     }
 
-    @GetMapping("/")
-    public String login(Model model) {
-        return "redirect:/login";
+    @GetMapping("/info")
+    public ResponseEntity<UserDTO> getCurrentUserInfo (Authentication authentication) {
+        User currentUser = (User) authentication.getPrincipal();
+        UserDTO userDTO = userMapper.mapTo(currentUser);
+        return ResponseEntity.ok(userDTO);
     }
 }

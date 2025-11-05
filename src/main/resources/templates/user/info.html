@@ -27,20 +27,16 @@
             <div class="col">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
-                        <strong class="text-light me-3" th:text="${currentUser?.username}">username</strong>
+                        <strong class="text-light me-3" id="currentUsername">Loading...</strong>
                         <span class="text-light me-2">with roles</span>
-                        <div th:if="${currentUser?.roles}">
-                            <span th:each="role, iterStat : ${currentUser.roles}" class="badge bg-info me-1">
-                                <span th:text="${#strings.replace(role.name, 'ROLE_', '')}">Role</span>
-                            </span>
-                        </div>
-                        <div th:unless="${currentUser?.roles}">
-                            <span class="badge bg-secondary">No roles</span>
+                        <div id="currentUserRoles">
+                            <span class="badge bg-secondary">Loading...</span>
                         </div>
                     </div>
                     <div class="d-flex align-items-center">
                         <small class="text-muted me-3">User Profile</small>
-                        <form th:action="@{/logout}" method="post" class="mb-0">
+                        <form action="/logout" method="post" class="mb-0">
+                            <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
                             <button type="submit" class="btn btn-outline-warning btn-sm">
                                 Logout
                             </button>
@@ -58,18 +54,10 @@
             <nav class="navbar navbar-expand-md">
                 <div class="container-fluid flex-md-column align-items-start">
                     <span class="navbar-brand mb-3 h1">Navigation</span>
-                    <div class="navbar-nav flex-column w-100">
-                        <a th:href="@{/user/info}" class="nav-link btn btn-outline-primary mb-2 text-start">
+                    <div class="navbar-nav flex-column w-100" id="navigationLinks">
+                        <a href="/user/info" class="nav-link btn btn-outline-primary mb-2 text-start">
                             User
                         </a>
-
-                        <th:block th:each="role : ${currentUser?.roles}">
-                            <a th:if="${role.name == 'ROLE_ADMIN'}"
-                               th:href="@{/admin/list}"
-                               class="nav-link btn btn-outline-success mb-2 text-start">
-                                Admin
-                            </a>
-                        </th:block>
                     </div>
                 </div>
             </nav>
@@ -90,27 +78,132 @@
                     <th>Roles</th>
                 </tr>
                 </thead>
-                <tbody>
-                <tr th:if="${currentUser}">
-                    <td th:text="${currentUser.id}"></td>
-                    <td th:text="${currentUser.username}"></td>
-                    <td th:text="${currentUser.firstName}"></td>
-                    <td th:text="${currentUser.lastName}"></td>
-                    <td>
-                            <span th:each="role, iterStat : ${currentUser.roles}">
-                                <span class="badge bg-primary"
-                                      th:text="${#strings.replace(role.name, 'ROLE_', '')}">Role</span>
-                                <span th:if="${!iterStat.last}"> </span>
-                            </span>
-                    </td>
-                </tr>
+                <tbody id="userTableBody">
                 </tbody>
             </table>
-
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        loadCurrentUser();
+    });
+
+    async function apiCall(url, options = {}) {
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                },
+                ...options
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || `HTTP error! status: ${response.status}`);
+            }
+
+            const responseText = await response.text();
+            try {
+                return JSON.parse(responseText);
+            } catch (e) {
+                return responseText;
+            }
+        } catch (error) {
+            console.error('API call failed:', error);
+            throw error;
+        }
+    }
+
+    async function loadCurrentUser() {
+        try {
+            const user = await apiCall('/api/user/info');
+
+            document.getElementById('currentUsername').textContent = user.username;
+
+            const rolesContainer = document.getElementById('currentUserRoles');
+            rolesContainer.innerHTML = '';
+
+            let userRoles = [];
+            if (user.roles && user.roles.length > 0) {
+                user.roles.forEach(role => {
+                    let roleName = '';
+                    if (typeof role === 'string') {
+                        roleName = role;
+                    } else if (role.name) {
+                        roleName = role.name;
+                    }
+                    roleName = roleName.replace('ROLE_', '');
+
+                    const badge = document.createElement('span');
+                    badge.className = 'badge bg-info me-1';
+                    badge.textContent = roleName; // Keep as uppercase like ADMIN
+                    rolesContainer.appendChild(badge);
+
+                    userRoles.push(roleName);
+                });
+            }
+
+            updateNavigation(userRoles);
+
+            const tbody = document.getElementById('userTableBody');
+            let roleBadges = '<span class="badge bg-secondary">No roles</span>';
+            if (user.roles && user.roles.length > 0) {
+                roleBadges = user.roles.map(role => {
+                    let roleName = '';
+                    if (typeof role === 'string') {
+                        roleName = role;
+                    } else if (role.name) {
+                        roleName = role.name;
+                    }
+                    roleName = roleName.replace('ROLE_', '');
+                    return `<span class="badge bg-primary me-1">${roleName}</span>`; // Keep as uppercase
+                }).join(' ');
+            }
+
+            tbody.innerHTML = `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${user.firstName}</td>
+                    <td>${user.lastName}</td>
+                    <td>${roleBadges}</td>
+                </tr>
+            `;
+
+        } catch (error) {
+            console.error('Failed to load user info:', error);
+            document.getElementById('currentUsername').textContent = 'Error loading user';
+        }
+    }
+
+    function updateNavigation(userRoles) {
+        const navigationContainer = document.getElementById('navigationLinks');
+
+        let navigationHTML = `
+            <a href="/user/info" class="nav-link btn btn-outline-primary mb-2 text-start">
+                User
+            </a>
+        `;
+
+        const hasAdminRole = userRoles.some(role =>
+            role.toLowerCase() === 'admin'
+        );
+
+        if (hasAdminRole) {
+            navigationHTML += `
+                <a href="/admin/users" class="nav-link btn btn-outline-success mb-2 text-start">
+                    Admin
+                </a>
+            `;
+        }
+
+        navigationContainer.innerHTML = navigationHTML;
+    }
+</script>
 </body>
 </html>
