@@ -1,0 +1,14 @@
+.sidebar {
+    min-height: 100vh;
+    background-color: #212529;
+}
+
+.content {
+    padding: 20px;
+}
+
+.top-bar {
+    background-color: #343a40;
+    border-bottom: 1px solid #495057;
+    padding: 10px 0;
+}
